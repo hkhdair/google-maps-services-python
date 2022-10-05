@@ -191,7 +191,7 @@ class PlacesTest(TestCase):
         self.assertTrue(isinstance(response, GeneratorType))
         self.assertEqual(1, len(responses.calls))
         self.assertURLEqual(
-            "%s?maxwidth=100&photoreference=%s&key=%s" % (url, ref, self.key),
+            f"{url}?maxwidth=100&photoreference={ref}&key={self.key}",
             responses.calls[0].request.url,
         )
 
@@ -246,6 +246,6 @@ class PlacesTest(TestCase):
 
         self.assertEqual(1, len(responses.calls))
         self.assertURLEqual(
-            "%s?input=pizza+near+New+York&key=%s" % (url, self.key),
+            f"{url}?input=pizza+near+New+York&key={self.key}",
             responses.calls[0].request.url,
         )
