@@ -20,6 +20,7 @@ Core client functionality, common across all API requests (including performing
 HTTP requests).
 """
 
+
 import base64
 import collections
 from datetime import datetime
@@ -40,7 +41,7 @@ except ImportError: # Python 2
     from urllib import urlencode
 
 _X_GOOG_MAPS_EXPERIENCE_ID = "X-Goog-Maps-Experience-ID"
-_USER_AGENT = "GoogleGeoApiClientPython/%s" % googlemaps.__version__
+_USER_AGENT = f"GoogleGeoApiClientPython/{googlemaps.__version__}"
 _DEFAULT_BASE_URL = "https://maps.googleapis.com"
 
 _RETRIABLE_STATUSES = {500, 503, 504}
@@ -133,12 +134,11 @@ class Client:
         if key and not key.startswith("AIza"):
             raise ValueError("Invalid API key provided.")
 
-        if channel:
-            if not re.match("^[a-zA-Z0-9._-]*$", channel):
-                raise ValueError("The channel argument must be an ASCII "
-                    "alphanumeric string. The period (.), underscore (_)"
-                    "and hyphen (-) characters are allowed. If used without "
-                    "client_id, it must be 0-999.")
+        if channel and not re.match("^[a-zA-Z0-9._-]*$", channel):
+            raise ValueError("The channel argument must be an ASCII "
+                "alphanumeric string. The period (.), underscore (_)"
+                "and hyphen (-) characters are allowed. If used without "
+                "client_id, it must be 0-999.")
 
         self.session = requests_session or requests.Session()
         self.key = key
@@ -183,7 +183,7 @@ class Client:
         :param experience_id_args: the experience ID
         :type experience_id_args: string varargs
         """
-        if len(experience_id_args) == 0 or experience_id_args[0] is None:
+        if not experience_id_args or experience_id_args[0] is None:
             self.clear_experience_id()
             return
 
@@ -256,7 +256,7 @@ class Client:
 
         if base_url is None:
             base_url = self.base_url
-            
+
         if not first_request_time:
             first_request_time = datetime.now()
 
@@ -309,10 +309,7 @@ class Client:
                 time.sleep(1 - elapsed_since_earliest)
 
         try:
-            if extract_body:
-                result = extract_body(response)
-            else:
-                result = self._get_body(response)
+            result = extract_body(response) if extract_body else self._get_body(response)
             self.sent_times.append(time.time())
             return result
         except googlemaps.exceptions._RetriableRequest as e:
@@ -334,7 +331,7 @@ class Client:
         body = response.json()
 
         api_status = body["status"]
-        if api_status == "OK" or api_status == "ZERO_RESULTS":
+        if api_status in ["OK", "ZERO_RESULTS"]:
             return body
 
         if api_status == "OVER_QUERY_LIMIT":
@@ -372,11 +369,11 @@ class Client:
 
             path = "?".join([path, urlencode_params(params)])
             sig = sign_hmac(self.client_secret, path)
-            return path + "&signature=" + sig
+            return f"{path}&signature={sig}"
 
         if self.key:
             params.append(("key", self.key))
-            return path + "?" + urlencode_params(params)
+            return f"{path}?{urlencode_params(params)}"
 
         raise ValueError("Must provide API key for this API. It does not accept "
                          "enterprise credentials.")
@@ -479,8 +476,7 @@ def urlencode_params(params):
     extended = []
     for key, val in params:
         if isinstance(val, (list, tuple)):
-            for v in val:
-                extended.append((key, normalize_for_urlencode(v)))
+            extended.extend((key, normalize_for_urlencode(v)) for v in val)
         else:
             extended.append((key, normalize_for_urlencode(val)))
     # Secondly, unquote unreserved chars which are incorrectly quoted
@@ -499,16 +495,10 @@ try:
         if isinstance(value, unicode):
             return value.encode('utf8')
 
-        if isinstance(value, str):
-            return value
-
-        return normalize_for_urlencode(str(value))
+        return value if isinstance(value, str) else normalize_for_urlencode(str(value))
 
 except NameError:
     def normalize_for_urlencode(value):
         """(Python 3) No-op."""
         # urlencode in Python 3 handles all the types we are passing it.
-        if isinstance(value, str):
-            return value
-
-        return normalize_for_urlencode(str(value))
+        return value if isinstance(value, str) else normalize_for_urlencode(str(value))
